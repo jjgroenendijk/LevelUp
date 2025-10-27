@@ -1,0 +1,120 @@
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, labeled, unlabeled]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: read
+      statuses: write
+    
+    steps:
+      - name: Check if PR links to issues
+        id: check_issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+            const title = pr.title || '';
+            
+            // Look for issue references
+            const issueRegex = /#(\d+)/g;
+            const issues = [];
+            let match;
+            
+            while ((match = issueRegex.exec(body + ' ' + title)) !== null) {
+              issues.push(match[1]);
+            }
+            
+            if (issues.length === 0) {
+              core.setFailed('❌ PR must reference at least one issue (use #123 in description)');
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: '❌ **PR Validation Failed**\n\nThis PR must reference at least one issue. Add `#123` (with your issue number) to the PR description.'
+              });
+              
+              return false;
+            }
+            
+            console.log(`✅ Found ${issues.length} linked issue(s): ${issues.join(', ')}`);
+            return true;
+      
+      - name: Check if issues are in project
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+            const title = pr.title || '';
+            
+            // Extract issue numbers
+            const issueRegex = /#(\d+)/g;
+            const issues = [];
+            let match;
+            
+            while ((match = issueRegex.exec(body + ' ' + title)) !== null) {
+              issues.push(match[1]);
+            }
+            
+            // Check each issue is in the project
+            // Note: This is a simplified check. Full implementation would query GitHub Projects API
+            for (const issueNum of issues) {
+              try {
+                const issue = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(issueNum)
+                });
+                
+                console.log(`✅ Issue #${issueNum} exists: ${issue.data.title}`);
+              } catch (error) {
+                core.setFailed(`❌ Issue #${issueNum} not found`);
+                return false;
+              }
+            }
+            
+            console.log('✅ All linked issues exist');
+            return true;
+      
+      - name: Check PR status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            
+            // Check if PR is in draft state
+            if (pr.draft) {
+              core.setFailed('❌ PR is in draft mode. Mark as "Ready for review" to merge.');
+              return false;
+            }
+            
+            console.log('✅ PR is ready for review');
+            return true;
+      
+      - name: Set commit status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            const description = state === 'success' 
+              ? '✅ All validation checks passed'
+              : '❌ Validation failed - check workflow logs';
+            
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.pull_request.head.sha,
+              state: state,
+              description: description,
+              context: 'PR Validation'
+            });

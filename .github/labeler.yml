@@ -1,0 +1,32 @@
+# Label PRs based on changed files
+
+# Homelab configurations
+homelab:
+  - homelab/**/*
+
+# Container images
+containers:
+  - containers/**/*
+
+# Docker compose files
+compose:
+  - "**/*compose*.yml"
+  - "**/*compose*.yaml"
+
+# Documentation
+documentation:
+  - docs/**/*
+  - "**/*.md"
+
+# CI/CD
+ci:
+  - .github/workflows/**/*
+
+# Scripts
+scripts:
+  - scripts/**/*
+
+# Infrastructure configs
+infrastructure:
+  - homelab/etc/**/*
+  - homelab/usr/**/*
