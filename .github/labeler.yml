@@ -1,32 +1,32 @@
 # Label PRs based on changed files
 
-# Homelab configurations
 homelab:
-  - homelab/**/*
+  - changed-files:
+    - any-glob-to-any-file: 'homelab/**/*'
 
-# Container images
 containers:
-  - containers/**/*
+  - changed-files:
+    - any-glob-to-any-file: 'containers/**/*'
 
-# Docker compose files
 compose:
-  - "**/*compose*.yml"
-  - "**/*compose*.yaml"
+  - changed-files:
+    - any-glob-to-any-file: '**/*compose*.yml'
+    - any-glob-to-any-file: '**/*compose*.yaml'
 
-# Documentation
 documentation:
-  - docs/**/*
-  - "**/*.md"
+  - changed-files:
+    - any-glob-to-any-file: 'docs/**/*'
+    - any-glob-to-any-file: '**/*.md'
 
-# CI/CD
 ci:
-  - .github/workflows/**/*
+  - changed-files:
+    - any-glob-to-any-file: '.github/workflows/**/*'
 
-# Scripts
 scripts:
-  - scripts/**/*
+  - changed-files:
+    - any-glob-to-any-file: 'scripts/**/*'
 
-# Infrastructure configs
 infrastructure:
-  - homelab/etc/**/*
-  - homelab/usr/**/*
+  - changed-files:
+    - any-glob-to-any-file: 'homelab/etc/**/*'
+    - any-glob-to-any-file: 'homelab/usr/**/*'
