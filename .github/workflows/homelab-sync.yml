@@ -1,0 +1,61 @@
+name: Homelab Configuration Sync
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'homelab/**'
+      - 'scripts/deploy.sh'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Configurations
+    runs-on: self-hosted
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Validate deployment script
+        run: |
+          if [[ ! -f "${GITHUB_WORKSPACE}/scripts/deploy.sh" ]]; then
+            echo "Error: Deployment script not found"
+            exit 1
+          fi
+          
+          if [[ ! -x "${GITHUB_WORKSPACE}/scripts/deploy.sh" ]]; then
+            echo "Error: Deployment script is not executable"
+            exit 1
+          fi
+      
+      - name: Run deployment
+        run: |
+          sudo "${GITHUB_WORKSPACE}/scripts/deploy.sh"
+      
+      - name: Check Docker Compose services
+        run: |
+          if [[ -f "/opt/levelup-runtime/docker-compose.yml" ]]; then
+            echo "Checking Docker Compose configuration..."
+            cd /opt/levelup-runtime
+            docker compose config --quiet
+            
+            echo "Restarting services..."
+            docker compose up -d --force-recreate
+            
+            echo "Service status:"
+            docker compose ps
+          else
+            echo "No Docker Compose configuration found, skipping service restart"
+          fi
+      
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "::notice::Homelab configuration deployed successfully"
+          echo "Repository: ${GITHUB_REPOSITORY}"
+          echo "Commit: ${GITHUB_SHA::7}"
+          echo "Branch: ${GITHUB_REF_NAME}"
