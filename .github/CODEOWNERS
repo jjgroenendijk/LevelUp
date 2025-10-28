@@ -1,0 +1,15 @@
+# Code Owners for LevelUp Repository
+# These users will be automatically requested for review when someone opens a pull request that modifies code in these locations
+
+# GitHub Actions workflows require owner approval
+/.github/workflows/ @jjgroenendijk
+
+# Deployment scripts are security-critical
+/scripts/ @jjgroenendijk
+
+# System configurations require careful review
+/homelab/etc/ @jjgroenendijk
+/homelab/usr/ @jjgroenendijk
+
+# Runner setup is security-sensitive
+/docs/automation/github-runner-*.md @jjgroenendijk

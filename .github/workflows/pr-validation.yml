@@ -8,11 +8,24 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
       issues: read
       statuses: write
     
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Validate shell scripts
+        run: |
+          echo "Validating shell scripts..."
+          find scripts/ -type f -name "*.sh" -print0 2>/dev/null | while IFS= read -r -d '' script; do
+            echo "Checking: $script"
+            bash -n "$script" || exit 1
+          done
+          echo "All shell scripts are valid"
+      
       - name: Check if PR links to issues
         id: check_issues
         uses: actions/github-script@v7
@@ -32,19 +45,19 @@ jobs:
             }
             
             if (issues.length === 0) {
-              core.setFailed('❌ PR must reference at least one issue (use #123 in description)');
+              core.setFailed('PR must reference at least one issue (use #123 in description)');
               
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: pr.number,
-                body: '❌ **PR Validation Failed**\n\nThis PR must reference at least one issue. Add `#123` (with your issue number) to the PR description.'
+                body: 'PR Validation Failed\n\nThis PR must reference at least one issue. Add `#123` (with your issue number) to the PR description.'
               });
               
               return false;
             }
             
-            console.log(`✅ Found ${issues.length} linked issue(s): ${issues.join(', ')}`);
+            console.log(`Found ${issues.length} linked issue(s): ${issues.join(', ')}`);
             return true;
       
       - name: Check if issues are in project
@@ -75,14 +88,14 @@ jobs:
                   issue_number: parseInt(issueNum)
                 });
                 
-                console.log(`✅ Issue #${issueNum} exists: ${issue.data.title}`);
+                console.log(`Issue #${issueNum} exists: ${issue.data.title}`);
               } catch (error) {
-                core.setFailed(`❌ Issue #${issueNum} not found`);
+                core.setFailed(`Issue #${issueNum} not found`);
                 return false;
               }
             }
             
-            console.log('✅ All linked issues exist');
+            console.log('All linked issues exist');
             return true;
       
       - name: Check PR status
@@ -93,11 +106,11 @@ jobs:
             
             // Check if PR is in draft state
             if (pr.draft) {
-              core.setFailed('❌ PR is in draft mode. Mark as "Ready for review" to merge.');
+              core.setFailed('PR is in draft mode. Mark as "Ready for review" to merge.');
               return false;
             }
             
-            console.log('✅ PR is ready for review');
+            console.log('PR is ready for review');
             return true;
       
       - name: Set commit status
@@ -107,8 +120,8 @@ jobs:
           script: |
             const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
             const description = state === 'success' 
-              ? '✅ All validation checks passed'
-              : '❌ Validation failed - check workflow logs';
+              ? 'All validation checks passed'
+              : 'Validation failed - check workflow logs';
             
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,

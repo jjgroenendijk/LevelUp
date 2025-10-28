@@ -1,188 +1,158 @@
 # GitHub Self-Hosted Runner Setup
 
-Documentation for configuring the GitHub Actions self-hosted runner for automated homelab deployments.
+Self-hosted runner configuration for automated homelab deployments with security hardening for public repositories.
 
-## Overview
+## Configuration
 
-The self-hosted runner enables automated deployment of configuration changes from the git repository to the live homelab environment. The runner executes on the same host machine and has the necessary permissions to deploy system configurations and restart services.
+- **Location**: `/opt/github-runner/`
+- **User**: `ghrunner`
+- **Repository**: jjgroenendijk/LevelUp (public)
+- **Version**: 2.329.0 (auto-updates)
+- **Service**: actions.runner.jjgroenendijk-LevelUp.homelab-runner.service
 
-## Architecture
+## Security for Public Repository
 
-- **Runner Location**: `/opt/github-runner/`
-- **Runner User**: `ghrunner` (dedicated service account)
-- **Permissions**: Passwordless sudo for specific deployment scripts
-- **Repository**: Connected to the LevelUp repository
-- **Triggers**: Executes workflows on push to `main` branch
+Self-hosted runners on public repositories are risky because any user can fork and submit malicious PRs. Security controls implemented:
 
-## Prerequisites
+**Workflow Restrictions**:
 
-- Arch Linux host system
-- Root access for initial setup
-- GitHub repository admin access
-- Docker installed and running
+- Deployment only runs on push to `main` (never on PRs or forks)
+- PR validation uses GitHub-hosted runners (ubuntu-latest)
+- CODEOWNERS requires owner approval for workflow changes
 
-## Installation Steps
+**Branch Protection** (`main` branch):
 
-### 1. Create Runner User
+- Require PR with 1 approval
+- Require passing status checks
+- No direct pushes
+- Require conversation resolution
+
+**Runner Isolation**:
+
+- Limited sudo (only specific scripts and commands)
+- No sensitive data on runner machine
+- Same network as services (no external access)
+
+**Repository Settings** (Actions > General):
+
+- Require approval for first-time contributors: Enabled
+- Require approval for all outside collaborators: Enabled
+
+## Installation
+
+### Remove Old Runner (if exists at /srv/github-runner)
 
 ```bash
+sudo systemctl stop actions.runner.*
+cd /srv/github-runner
+sudo -u ghrunner ./config.sh remove --token REMOVAL_TOKEN
+sudo rm -rf /srv/github-runner
+```
+
+### Install New Runner
+
+Get registration token: <https://github.com/jjgroenendijk/LevelUp/settings/actions/runners/new>
+
+```bash
+# Create user (if not exists)
 sudo useradd -r -m -d /opt/github-runner -s /bin/bash ghrunner
-sudo passwd -l ghrunner  # Lock password for security
-```
+sudo passwd -l ghrunner
 
-### 2. Download GitHub Runner
+# Download and extract
+sudo -u ghrunner mkdir -p /opt/github-runner
+cd /opt/github-runner
+sudo -u ghrunner curl -o actions-runner-linux-x64-2.329.0.tar.gz -L \
+  https://github.com/actions/runner/releases/download/v2.329.0/actions-runner-linux-x64-2.329.0.tar.gz
+sudo -u ghrunner tar xzf actions-runner-linux-x64-2.329.0.tar.gz
 
-Visit the repository settings to get the runner token and download URL.
+# Configure
+sudo -u ghrunner ./config.sh \
+  --url https://github.com/jjgroenendijk/LevelUp \
+  --token YOUR_TOKEN \
+  --name homelab-runner \
+  --labels self-hosted,Linux,X64,homelab \
+  --work _work \
+  --unattended
 
-```bash
-sudo su - ghrunner
-mkdir actions-runner && cd actions-runner
-curl -o actions-runner-linux-x64-VERSION.tar.gz -L https://github.com/actions/runner/releases/download/vVERSION/actions-runner-linux-x64-VERSION.tar.gz
-tar xzf ./actions-runner-linux-x64-VERSION.tar.gz
-```
-
-Replace `VERSION` with the latest release version from GitHub.
-
-### 3. Configure Runner
-
-```bash
-./config.sh --url https://github.com/OWNER/REPO --token YOUR_TOKEN
-```
-
-Configuration options:
-- Runner name: `homelab-runner` (or descriptive name)
-- Runner group: `Default`
-- Labels: `self-hosted,Linux,X64`
-- Work folder: `_work` (default)
-
-### 4. Configure Passwordless Sudo
-
-Create sudoers configuration for deployment script:
-
-```bash
-sudo visudo -f /etc/sudoers.d/ghrunner
-```
-
-Add the following content:
-
-```
-# GitHub Actions runner - deployment permissions
-ghrunner ALL=(ALL) NOPASSWD: /opt/levelup-source/scripts/deploy.sh
-ghrunner ALL=(ALL) NOPASSWD: /usr/bin/docker
-ghrunner ALL=(ALL) NOPASSWD: /usr/bin/rsync
-```
-
-Set proper permissions:
-
-```bash
-sudo chmod 0440 /etc/sudoers.d/ghrunner
-```
-
-### 5. Install Runner as Systemd Service
-
-```bash
+# Install service
 sudo ./svc.sh install ghrunner
 sudo ./svc.sh start
 ```
 
-Verify the service is running:
+### Configure Sudo Permissions
 
 ```bash
-sudo systemctl status actions.runner.*
+sudo tee /etc/sudoers.d/ghrunner > /dev/null <<'EOF'
+# Only grant access to specific commands needed for deployment
+ghrunner ALL=(ALL) NOPASSWD: /opt/levelup-source/scripts/deploy.sh
+ghrunner ALL=(ALL) NOPASSWD: /usr/bin/docker
+ghrunner ALL=(ALL) NOPASSWD: /usr/bin/rsync
+EOF
+
+sudo chmod 0440 /etc/sudoers.d/ghrunner
+sudo visudo -c
 ```
 
-### 6. Configure Git Access
-
-The runner needs access to the repository:
+### Verify
 
 ```bash
-sudo su - ghrunner
-ssh-keygen -t ed25519 -C "github-runner@homelab"
-cat ~/.ssh/id_ed25519.pub
+# Check service
+sudo systemctl status actions.runner.jjgroenendijk-LevelUp.homelab-runner.service
+
+# Check logs
+sudo journalctl -u actions.runner.* -n 50
+
+# Verify in GitHub: https://github.com/jjgroenendijk/LevelUp/settings/actions/runners
+# Should show "homelab-runner" with status "Idle"
 ```
 
-Add the public key as a deploy key in the repository settings (read-only access is sufficient).
+## Workflow Configuration
 
-## Security Considerations
+`.github/workflows/homelab-sync.yml`:
 
-### Principle of Least Privilege
+- Runs on: self-hosted
+- Trigger: push to main only
+- Condition: `github.ref == 'refs/heads/main'`
+- No environment approval (direct deployment)
 
-- Runner user has minimal sudo permissions
-- Only specific scripts can be executed with elevated privileges
-- Runner cannot modify arbitrary system files
-- SSH keys are read-only for repository access
+`.github/workflows/pr-validation.yml`:
 
-### Network Isolation
-
-- Runner executes on the same host as services (no remote access required)
-- No inbound network connections to runner
-- All communication initiated by runner to GitHub
-
-### Secret Management
-
-- Never store secrets in repository
-- Use GitHub Secrets for sensitive variables
-- Environment variables passed securely to workflows
+- Runs on: ubuntu-latest (GitHub-hosted, never self-hosted)
+- Trigger: pull_request
+- Validates shell scripts
+- Safe for any contributor
 
 ## Maintenance
 
-### Updating the Runner
+Monitor: `sudo journalctl -u actions.runner.* -f`
+
+Update (auto-updates enabled, manual rarely needed):
 
 ```bash
 sudo systemctl stop actions.runner.*
-sudo su - ghrunner
-cd actions-runner
-./config.sh remove --token YOUR_TOKEN
-# Download and extract new version
-./config.sh --url https://github.com/OWNER/REPO --token YOUR_TOKEN
-exit
+cd /opt/github-runner
+sudo -u ghrunner ./config.sh remove --token TOKEN
+# Download new version and extract
+sudo -u ghrunner ./config.sh --url https://github.com/jjgroenendijk/LevelUp --token TOKEN
 sudo systemctl start actions.runner.*
 ```
 
-### Monitoring
+## Troubleshooting
 
-Check runner status:
+**Runner not appearing**: `sudo journalctl -u actions.runner.* -n 100`
 
-```bash
-sudo systemctl status actions.runner.*
-sudo journalctl -u actions.runner.* -f
-```
+**Permission denied**: Verify `/etc/sudoers.d/ghrunner` and test `sudo -u ghrunner sudo /opt/levelup-source/scripts/deploy.sh`
 
-View workflow logs in GitHub Actions interface.
+**Workflow not running**: Check workflow conditions, branch protection, and that PR is merged to main
 
-### Troubleshooting
+## Risk Acceptance
 
-#### Runner Not Appearing in GitHub
+Running self-hosted runner on public repo carries inherent risks. Mitigations:
 
-- Check service status: `sudo systemctl status actions.runner.*`
-- Verify network connectivity: `curl -I https://github.com`
-- Check runner logs: `sudo journalctl -u actions.runner.* -n 50`
+- Workflow restrictions prevent fork PR execution
+- Manual approval required for merges to main
+- Limited sudo permissions
+- No secrets in repository
+- Regular monitoring
 
-#### Permission Denied Errors
-
-- Verify sudoers configuration: `sudo visudo -c`
-- Test sudo access: `sudo -u ghrunner sudo /opt/levelup-source/scripts/deploy.sh`
-- Check file permissions on deployment script
-
-#### Deployment Failures
-
-- Verify source repository is up to date
-- Check deployment script logs
-- Ensure target directories exist and are writable
-- Verify Docker socket permissions
-
-## Uninstall
-
-To remove the runner:
-
-```bash
-sudo systemctl stop actions.runner.*
-sudo ./svc.sh uninstall
-sudo userdel -r ghrunner
-sudo rm /etc/sudoers.d/ghrunner
-```
-
-## References
-
-- [GitHub Actions Self-Hosted Runners](https://docs.github.com/en/actions/hosting-your-own-runners)
-- [Hardening Self-Hosted Runners](https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions)
+Alternative: Make repository private (safer but limits community engagement).

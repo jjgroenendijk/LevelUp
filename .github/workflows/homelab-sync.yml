@@ -9,10 +9,14 @@ on:
       - 'scripts/deploy.sh'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Deploy Configurations
     runs-on: self-hosted
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     
     steps:
       - name: Checkout repository
