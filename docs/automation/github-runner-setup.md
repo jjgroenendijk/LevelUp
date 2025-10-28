@@ -83,12 +83,10 @@ sudo ./svc.sh start
 
 ```bash
 sudo tee /etc/sudoers.d/ghrunner > /dev/null <<'EOF'
+# Only grant access to specific commands needed for deployment
 ghrunner ALL=(ALL) NOPASSWD: /opt/levelup-source/scripts/deploy.sh
 ghrunner ALL=(ALL) NOPASSWD: /usr/bin/docker
 ghrunner ALL=(ALL) NOPASSWD: /usr/bin/rsync
-ghrunner ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart *
-ghrunner ALL=(ALL) NOPASSWD: /usr/bin/systemctl start *
-ghrunner ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop *
 EOF
 
 sudo chmod 0440 /etc/sudoers.d/ghrunner
