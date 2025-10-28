@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'homelab/**'
+      - 'services/**'
       - 'scripts/deploy.sh'
   workflow_dispatch:
 

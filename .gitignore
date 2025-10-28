@@ -1,3 +1,79 @@
+# Environment and secrets
 .env
+*.env
+!.env.example
+
+# Project management (kept local)
 plan.md
 rules.md
+
+# Editor and IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+*.cache
+
+# Data directories (never commit service data)
+**/data/
+**/logs/
+**/cache/
+**/tmp/
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+**/certs/
+**/ssl/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# Backup files
+*.backup
+**/backups/
+
+# AI/ML models and large files
+**/models/
+*.bin
+*.onnx
+*.pt
+*.pth
+*.h5
+*.pkl
+
+# Media and large binary files
+**/media/
+*.mkv
+*.mp4
+*.avi
+*.iso
+
+# Container runtime files
+**/volumes/
+**/mounts/
+
+# Git internals
+.git/
+.gitkeep
+
+# Build artifacts
+**/build/
+**/dist/
+**/__pycache__/
+*.pyc
+*.pyo

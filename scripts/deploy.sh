@@ -45,15 +45,16 @@ fi
 # Define paths
 REPO_ROOT="/opt/levelup-source"
 HOMELAB_DIR="${REPO_ROOT}/homelab"
+SERVICES_DIR="${REPO_ROOT}/services"
 RUNTIME_DIR="/opt/levelup-runtime"
 
-# Validate source directory exists
-if [[ ! -d "${HOMELAB_DIR}" ]]; then
-    log_error "Source directory not found: ${HOMELAB_DIR}"
+# Validate source directories exist
+if [[ ! -d "${HOMELAB_DIR}" ]] && [[ ! -d "${SERVICES_DIR}" ]]; then
+    log_error "Source directories not found: ${HOMELAB_DIR} and ${SERVICES_DIR}"
     exit 1
 fi
 
-log_info "Starting deployment from ${HOMELAB_DIR}"
+log_info "Starting deployment from repository"
 
 # Function to sync directory with rsync
 # Args: source_dir, target_dir, description
@@ -92,12 +93,12 @@ sync_directory() {
     fi
 }
 
-# Sync runtime directory (docker-compose configs, service configs)
-if [[ -d "${HOMELAB_DIR}/opt/levelup-runtime" ]]; then
+# Sync services directory (docker-compose configs, service configs)
+if [[ -d "${SERVICES_DIR}" ]]; then
     sync_directory \
-        "${HOMELAB_DIR}/opt/levelup-runtime" \
+        "${SERVICES_DIR}" \
         "${RUNTIME_DIR}" \
-        "runtime configurations"
+        "service configurations"
 fi
 
 # Sync system configurations to /etc
