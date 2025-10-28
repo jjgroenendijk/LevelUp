@@ -12,10 +12,12 @@ The deployment pipeline automatically synchronizes configuration files from the 
 
 ```
 /opt/levelup-source/          # Git repository (version controlled)
-├── homelab/                  # Source configurations
+├── services/                 # Service configurations
+│   ├── docker-compose*.yml  # Service orchestration
+│   └── {service}/           # Service-specific configs
+├── homelab/                  # System-level configurations
 │   ├── etc/                 # System configurations
-│   ├── usr/local/bin/       # Custom scripts
-│   └── opt/levelup-runtime/ # Service configurations
+│   └── usr/local/bin/       # Custom scripts
 └── scripts/
     └── deploy.sh            # Deployment automation
 
@@ -31,7 +33,9 @@ The deployment pipeline automatically synchronizes configuration files from the 
 
 Location: `/opt/levelup-source/`
 
-The version-controlled git repository contains all configuration files in a filesystem hierarchy under `homelab/` that mirrors the target deployment locations.
+The version-controlled git repository contains all configuration files:
+- **`services/`**: Service configurations and Docker Compose files
+- **`homelab/`**: System-level configurations that mirror filesystem hierarchy
 
 #### 2. Deployment Script
 
@@ -48,7 +52,7 @@ Bash script that synchronizes configurations from the repository to live locatio
 Location: `.github/workflows/homelab-sync.yml`
 
 Automated workflow that:
-- Triggers on push to `main` branch affecting `homelab/` or deployment scripts
+- Triggers on push to `main` branch affecting `services/`, `homelab/`, or deployment scripts
 - Runs on self-hosted runner with elevated permissions
 - Executes deployment script
 - Restarts Docker Compose services if configurations changed
@@ -66,11 +70,11 @@ GitHub Actions runner service that:
 
 ## Deployment Flow
 
-1. **Change Creation**: Configuration files modified in `homelab/` directory
+1. **Change Creation**: Configuration files modified in `services/` or `homelab/` directory
 2. **Commit**: Changes committed to feature branch following Conventional Commits
 3. **Pull Request**: PR created and reviewed (automated validation runs)
 4. **Merge**: PR merged to `main` branch
-5. **Trigger**: GitHub Actions detects push to `main` affecting `homelab/`
+5. **Trigger**: GitHub Actions detects push to `main` affecting `services/` or `homelab/`
 6. **Execution**: Self-hosted runner checks out latest code
 7. **Validation**: Deployment script existence and permissions verified
 8. **Sync**: Configuration files synchronized to target locations
@@ -92,11 +96,12 @@ git checkout -b chore/update-service-config
 
 #### 2. Edit Configurations
 
-Edit files in the appropriate `homelab/` subdirectory:
+Edit files in the appropriate directory:
 
 ```bash
 # Service configurations
-vim homelab/opt/levelup-runtime/traefik/traefik.yml
+vim services/traefik/traefik.yml
+vim services/docker-compose.yml
 
 # System configurations
 vim homelab/etc/systemd/system/backup.service
@@ -115,7 +120,7 @@ sudo /opt/levelup-source/scripts/deploy.sh
 #### 4. Commit and Push
 
 ```bash
-git add homelab/
+git add services/ homelab/
 git commit -m "chore: update traefik SSL configuration"
 git push origin chore/update-service-config
 ```
@@ -149,10 +154,10 @@ docker compose up -d --force-recreate
 
 ### What Gets Tracked
 
-Files in the `homelab/` directory that should be version controlled:
+Files that should be version controlled:
 
-- YAML/TOML/INI configuration files
-- Docker Compose files
+- YAML/TOML/INI configuration files (in `services/` and `homelab/`)
+- Docker Compose files (in `services/`)
 - Shell scripts
 - Systemd unit files
 - Network configurations
@@ -246,7 +251,7 @@ sudo /opt/levelup-source/scripts/deploy.sh
 #### Deployment Script Fails
 
 - Check script permissions: `ls -l /opt/levelup-source/scripts/deploy.sh`
-- Verify source directory exists: `ls -ld /opt/levelup-source/homelab`
+- Verify source directories exist: `ls -ld /opt/levelup-source/services /opt/levelup-source/homelab`
 - Check rsync availability: `which rsync`
 
 #### Services Not Restarting
